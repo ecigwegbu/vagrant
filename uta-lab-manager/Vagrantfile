@@ -1,0 +1,412 @@
+# encoding: UTF-8
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+# Unix Training Academy Lab Manager™ version 1.0-beta (Windows/PowerShell edition)
+#
+# README:
+#
+# This Vagrantfile provisions the Unix Training Academy training lab. The lab consists of a RHEL9 workstation
+# and one or more other RHEL9 servers, named servera, serverb, etc (default: workstation + 2 others), up to 
+# a maximum of 26 servers + workstation, limited by your system's memory. Workstation uses 2 GB of RAM while
+# the other servers use 1 GB RAM each. (Warning: exceeding 2 servers could run down your system's memory).
+#
+# Three users vagrant, student, and ansible are defined in each VM (with initial passwords same as username).
+# By default, for user vagrant, Vagrant provides password-less key-based ssh login to each VM, from Windows.
+# This version is for Windows host only. The three users can use sudo within the VMs without password.
+#
+# Users student and ansible have password-based ssh login from the host OS (Windows), for each VM. In addition,
+# student and ansible can ssh from any VM to any other VM without password. 
+# Finally, for user ansible, worstation also serves as an Ansible Control Node, while servers servera,
+# serverb etc serve as Ansible managed hosts with password-less ssh connection.
+#
+# Ansible is installed on the Control Node (workstation), with pre-loaded initial inventory file at 
+# /etc/ansible/inventory and config file at /etc/ansible/ansible.cfg. The ungrouped hosts in the inventory
+# include the ip addresses, short names and fqdn of all managed hosts. The Control Node (workstation) is 
+# accessible as localhost in Ansible. Only the fqdn are used in the host groups in the inventory. 
+# This arrangement ensures that Ansible can connect to either the ips, short names or fqdns without complaint.
+# The default Ansible remote user is ansible. Privilege escalation to root is password-less,
+# and false by default.
+
+# Required Environment variables: they can be permanently set in Windows or PowerShell, 
+# before starting Vagrantfile, or set on the command line when starting Vagrantfile:
+# HOSTS - the number of managed hosts; default 2         ---OPTIONAL; Default: 2---
+# REDHAT_USERNAME - for Red Hat subscription manager     ---MANDATORY---
+# REDHAT_PASSWORD - ==do==                               ---MANDATORY---
+# The password and username can also be input interactively and (optionally) saved permanently at runtime.
+
+# To permanently save any of these before starting Vagrantfile, in PowerShell, use the syntax below:
+# [Environment]::SetEnvironmentVariable('REDHAT_USERNAME', 'example-jdoe1998', [EnvironmentVariableTarget]::User)
+# To delete a saved environment variable, in PowerShell, use the syntax below:
+# [Environment]::SetEnvironmentVariable('REDHAT_USERNAME', $null, [EnvironmentVariableTarget]::User)
+
+# To specify an environment variable on the command line when starting Vagrant, use the syntax below:
+# $env:HOSTS=2; $env:REDHAT_USERNAME="example-jdoe1998"; REDHAT_PASSWORD="example-k45U_T6hi0Yt" vagrant up
+
+# If The Lab Manager is unable to find the Red Hat username/password at runtime, the user will be prompted
+# to specify them interactively, and can then optionally save them permanently to the OS.
+
+# To use the Vagrantfile, enter this command in PowerShell (start PowerShell as Administrator):
+# $env:HOSTS=2; $env:REDHAT_USERNAME="example-jdoe1998"; REDHAT_PASSWORD="example-k45U_T6hi0Yt" vagrant up
+# Or simply: vagrant up  (to use default values from the Environment)
+# Then wait until it finishes provisioning, unless otherwise prompted for username/password.
+# If HOSTS is not specified (commandline or Environment) then a default value of 2 
+# (for servera and serverb) will be used. (This default can be changed within the Vagrantfile, see below.)
+#
+# Once the provisioning ends, from the Vagrantfile directory, ssh to workstation 
+# (starting with workstation is the typical use case, but servera, serverb, etc is also possible):
+# vagrant ssh workstation
+# You will be automatically logged in as user vagrant (password not required).
+# Once logged in, you can su to user student or ansible and can freely ssh from one server to another 
+# as user student or ansible. It is recommended to use user student for all routine tasks.
+#
+# Alternatively, you can use another ssh client (like putty from the Windows host)
+# to login as user vagrant (key-based) or user student or ansible (password-based)
+# The ssh private key for user vagrant is located within your Vagrant project directory at:
+# '.vagrant\machines\<server-name>\virtualbox\private_key'. (Note: Only user vagrant has key-based
+# ssh login from the Windows, using a client like putty)
+#
+# My recommended approach is to login directly as user student, and password student, using putty.
+# Users student and ansible have password-based login from Windows host using putty (for example),
+# and can do ssh password-less key-based connections to any of the provisioned servers once logged into
+# any server.
+#
+# To end a session without destroying the servers:
+# vagrant suspend (to save/suspend the VM), or
+# vagrant halt (to shut down)
+# Warning: Do NOT run 'vagrant destroy' unless you wish to destroy the VMs (eg at the end 
+# of a project/course after backing up your data)
+#
+# To resume a suspended or halted session: vagrant up or vagrant resume
+# For help using vagrant: vagrant -h
+#
+# This file must be saved with the name 'Vagrantfile' in your project directory in Windows.
+# Then download and install Oracle VirtualBox and Vagrant for Windows from their respective websites
+# before running this Vagrantfile. It is not necessary to download a RHEL9 image first. It will be 
+# automatically downloaded the first time this Vagrant file is run on your system.
+# 
+# For updates, checkout: Github: https://github.com/ecigwegbu/vagrant/uta-lab-manager/Vagrantfile
+# Author: Elias C. Igwegbu, B.ENG, MBA, MNSE, SWE-ALX/Holberton, RHCSA, AWS-CCP
+# Lab Manager™ © 2024 Unix Training Academy. All Rights Reserved.
+
+## Lab Manager™ begin...
+
+require 'io/console'
+
+puts "\nLab Manager\u2122 version 1.0-beta\n\u00A9 2024 Unix Training Academy. All Rights Reserved...\n\n"
+
+# Attempt to read the HOSTS environment variable, defaulting to DEFAULT_NUMBER_MANAGED_HOSTS if not set or invalid
+DEFAULT_NUMBER_MANAGED_HOSTS = 2 # Will be used if the HOSTS env is not specified at all or is invalid.
+begin
+  number_managed_hosts = Integer(ENV['HOSTS'] || DEFAULT_NUMBER_MANAGED_HOSTS)
+rescue ArgumentError
+  number_managed_hosts = DEFAULT_NUMBER_MANAGED_HOSTS
+end
+
+# Validate the number of managed hosts to be between 1 and 26, inclusive
+number_managed_hosts = number_managed_hosts.between?(1, 26) ? number_managed_hosts : DEFAULT_NUMBER_MANAGED_HOSTS
+
+# Check if the REDHAT_USERNAME environment variable is set
+if ENV['REDHAT_USERNAME'].nil? || ENV['REDHAT_USERNAME'].empty? || ENV['REDHAT_PASSWORD'].nil? || ENV['REDHAT_PASSWORD'].empty?
+  puts "Environment variable 'REDHAT_USERNAME or REDHAT_PASSWORD' is not set.\n"
+  puts "To avoid seing this prompt again, add these to your Environment variables in your OS.\n\n"
+  puts "Enter REDHAT_USERNAME (or press Enter to exit):"
+
+  # Prompt the user for input for REDHAT_USERNAME
+  user_input = STDIN.gets.chomp
+
+  # Exit if the user did not provide any input
+  if user_input.empty?
+    puts "No input provided. Exiting..."
+    exit
+  else
+    # Use the provided input as REDHAT_USERNAME value for this session
+    ENV['REDHAT_USERNAME'] = user_input
+  end
+
+  # Prompt the user for input for REDHAT_PASSWORD
+  puts "Enter REDHAT_PASSWORD (or press Enter to exit):"
+  
+  # Masking the input for REDHAT_PASSWORD
+  user_input = STDIN.noecho(&:gets).chomp
+
+  # Exit if the user did not provide any input
+  if user_input.empty?
+    puts "\nNo input provided. Exiting..."
+    exit
+  else
+    # Use the provided input as REDHAT_PASSWORD value for this session
+    ENV['REDHAT_PASSWORD'] = user_input
+    puts "\n'REDHAT_USERNAME / REDHAT_PASSWORD' now set for this session only."
+    user_input = "" # Initialize user_input to an empty string
+    until user_input == 'y' || user_input == 'yes'
+      puts "Would you like to save these now to your OS permanently? (y/N)"
+      user_input = STDIN.gets.chomp.downcase # Read and process the input
+    
+      # Break the loop if the input is explicitly 'n', 'no', or empty (ENTER)
+      break if user_input == 'n' || user_input == 'no' || user_input.empty?
+    
+      # Act on affirmative response
+      if user_input == 'y' || user_input == 'yes'
+        rh_username = ENV['REDHAT_USERNAME'] 
+        system("powershell", "-Command", "[System.Environment]::SetEnvironmentVariable('REDHAT_USERNAME', '#{rh_username}', [System.EnvironmentVariableTarget]::User)")
+        rh_password = ENV['REDHAT_PASSWORD']
+        system("powershell", "-Command", "[System.Environment]::SetEnvironmentVariable('REDHAT_PASSWORD', '#{rh_password}', [System.EnvironmentVariableTarget]::User)")
+        puts 'Credentials saved.\n'
+      end
+    end
+    
+    # If the loop exits without an affirmative response, treat it as 'NO'
+    if user_input != 'y' && user_input != 'yes'
+      puts 'Credentials not saved (used for this session only).\n'
+    end
+  end
+end
+
+# Get the Red Hat subscription-manager credentials
+redhat_username = ENV['REDHAT_USERNAME']
+redhat_password = ENV['REDHAT_PASSWORD']
+
+# Create the Global variables
+ANSIBLE_CFG = <<~HEREDOC
+  [defaults]
+  inventory=/etc/ansible/inventory
+  remote_user=ansible
+  become=false
+  ask_pass=false
+  become_user=root
+  become_ask_pass=false
+HEREDOC
+
+ANSIBLE_INVENTORY_1 = <<~HEREDOC
+  [webservers]
+  servera.lab.uta.com
+  [app]
+  servera.lab.uta.com
+  [db]
+  [usa]
+  servera.lab.uta.com
+  [canada]
+HEREDOC
+
+ANSIBLE_INVENTORY_2 = <<~HEREDOC
+  [webservers]
+  servera.lab.uta.com
+  [app]
+  serverb.lab.uta.com
+  [db]
+  serverb.lab.uta.com
+  [usa]
+  servera.lab.uta.com
+  [canada]
+  serverb.lab.uta.com
+HEREDOC
+
+ANSIBLE_INVENTORY_3 = <<~HEREDOC
+  [webservers]
+  servera.lab.uta.com
+  serverb.lab.uta.com
+  [app]
+  serverc.lab.uta.com
+  [db]
+  serverc.lab.uta.com
+  [usa]
+  servera.lab.uta.com
+  serverb.lab.uta.com
+  [canada]
+  serverc.lab.uta.com
+HEREDOC
+
+ANSIBLE_INVENTORY_4 = <<~HEREDOC
+  [webservers]
+  servera.lab.uta.com
+  serverb.lab.uta.com
+  [app]
+  serverc.lab.uta.com
+  [db]
+  serverd.lab.uta.com
+  [usa]
+  servera.lab.uta.com
+  serverb.lab.uta.com
+  serverc.lab.uta.com
+  [canada]
+  serverd.lab.uta.com
+HEREDOC
+
+# Build ETC_HOSTS data - sample: ip servera servera.lab.uta.com...
+ETC_HOSTS_LIST = "192.168.56.10 workstation workstation.lab.uta.com\n" + \
+  (1..number_managed_hosts).map { |i| "192.168.56.#{(10 + i)}" + \
+  " server#{('a'.ord + i - 1).chr}" + \
+  " server#{('a'.ord + i - 1).chr}.lab.uta.com" }.join("\n")
+puts "Hosts List:\n" + ETC_HOSTS_LIST
+puts
+
+# Build INVENTORY_UNGROUPED data - sample: ip\n servera\n servera.lab.uta.com\n...
+INVENTORY_UNGROUPED_LIST = (1..number_managed_hosts).map { |i| "192.168.56.#{(10 + i)}\n" + \
+  "server#{('a'.ord + i - 1).chr}\n" + \
+  "server#{('a'.ord + i - 1).chr}.lab.uta.com\n" }.join("\n")
+
+# Build SERVER_LIST data - sample: servera\n serverb\n ...
+SERVER_LIST = (1..number_managed_hosts).map { |i| " server#{('a'.ord + i - 1).chr}" }.join("\n")
+
+# Build KNOWN_HOSTS_LIST data - sample: servera\n serverb\n ...
+KNOWN_HOSTS_LIST = "192.168.56.10\nworkstation\nworkstation.lab.uta.com\n" + \
+(1..number_managed_hosts).map { |i| "192.168.56.#{(10 + i)}\n" + \
+"server#{('a'.ord + i - 1).chr}\n" + \
+"server#{('a'.ord + i - 1).chr}.lab.uta.com" }.join("\n")
+
+Vagrant.configure("2") do |config|
+
+  # Dynamically create managed host VMs
+  (1..number_managed_hosts).each do |i|
+    config.vm.define "server#{('a'.ord + i - 1).chr}" do |server|
+      server.vm.box = "generic/rhel9"
+      server.vm.hostname = "server#{('a'.ord + i - 1).chr}.lab.uta.com"
+      server.vm.network "private_network", ip: "192.168.56.#{10 + i}"
+
+      # Enable password authentication and reload SSHD
+      server.vm.provision "shell", inline: <<-SHELL
+        sudo sed -i.bak 's/^PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
+        sudo systemctl reload sshd
+        # Register the system (using placeholder credentials)
+        echo "Registering the system with subscription-manager..."
+        subscription-manager register --username "#{redhat_username}" --password "#{redhat_password}" --auto-attach
+        if [ $? -eq 0 ]; then
+          echo "#{server.vm.hostname} registered successfully.\nRegistering insights-client..."
+          insights-client --register &> /dev/null
+          echo "Done."
+        else
+          echo "System registration failed. Please check your credentials or network connectivity."
+          exit 1
+        fi
+        # Set root password to 'redhat'
+        echo 'redhat' | passwd root --stdin
+
+        # Provision a new 'student' user
+        # Create the student user with a home directory and password 'student'
+        student_password=$(openssl passwd -6 -salt "UTAisTheBest" "student")
+        useradd -m -d /home/student -p "${student_password}" -s /bin/bash student
+        # Give student passwordless sudo privileges
+        echo "student ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/student
+
+        # Populate etc/hosts
+        echo "\n#{ETC_HOSTS_LIST}" >> /etc/hosts
+
+        # User 'ansible'
+        # Create the ansible user with a home directory and password 'ansible'
+        ansible_password=$(openssl passwd -6 -salt "UTAisTheBest" "ansible")
+        useradd -m -d /home/ansible -p "${ansible_password}" -s /bin/bash ansible
+        # Give ansible passwordless sudo privileges
+        echo "ansible ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/ansible
+
+      SHELL
+    end
+  end
+  # Workstation configuration
+  config.vm.define "workstation" do |workstation|
+    workstation.vm.box = "generic/rhel9"
+    workstation.vm.hostname = "workstation.lab.uta.com"
+    workstation.vm.network "private_network", ip: "192.168.56.10"
+
+    # Enable password authentication and reload SSHD
+    workstation.vm.provision "shell", inline: <<-SHELL
+      sudo sed -i.bak 's/^PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
+      sudo systemctl reload sshd
+      # Register the system (using placeholder credentials)
+      echo "Registering the system with subscription-manager..."
+      subscription-manager register --username "#{redhat_username}" --password "#{redhat_password}" --auto-attach
+      if [ $? -eq 0 ]; then
+      echo "#{workstation.vm.hostname} registered successfully.\nRegistering insights-client..."
+      insights-client --register &> /dev/null
+      echo "Done."
+      else
+        echo "System registration failed. Please check your credentials or network connectivity."
+        exit 1
+      fi
+
+      # Populate etc/hosts on workstation
+      echo "\n#{ETC_HOSTS_LIST}" > /tmp/etc_hosts_vtYrd4ErWo
+      cat /tmp/etc_hosts_vtYrd4ErWo >> /etc/hosts
+
+      # Set root password to 'redhat'
+      echo 'redhat' | passwd root --stdin
+
+      # Provision a new 'student' user
+      # Create the student user with a home directory and password 'student'
+      student_password=$(openssl passwd -6 -salt "UTAisTheBest" "student")
+      useradd -m -d /home/student -p "${student_password}" -s /bin/bash student
+      # Give student passwordless sudo privileges
+      echo "student ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/student
+      # Generate SSH credentials for user student
+      su student -c "ssh-keygen -b 2048 -t rsa -f /home/student/.ssh/id_rsa -q -N ''"
+      su student -c "cat /home/student/.ssh/id_rsa.pub >> /home/student/.ssh/authorized_keys"
+      chmod 600 /home/student/.ssh/authorized_keys
+
+      # User 'ansible'
+      # Create the ansible user with a home directory and password 'ansible'
+      ansible_password=$(openssl passwd -6 -salt "UTAisTheBest" "ansible")
+      useradd -m -d /home/ansible -p "${ansible_password}" -s /bin/bash ansible
+      # Give ansible passwordless sudo privileges
+      echo "ansible ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/ansible
+      # Generate SSH credentials for user ansible
+      su ansible -c "ssh-keygen -b 2048 -t rsa -f /home/ansible/.ssh/id_rsa -q -N ''"
+      su ansible -c "cat /home/ansible/.ssh/id_rsa.pub >> /home/ansible/.ssh/authorized_keys"
+      chmod 600 /home/ansible/.ssh/authorized_keys
+
+      # Install Ansible and sshpass
+      dnf makecache
+      dnf -y install epel-release
+      dnf -y install ansible sshpass
+      ansible --version
+
+      # Create the Ansible Config file
+      echo "#{ANSIBLE_CFG}" > /etc/ansible/ansible.cfg
+      
+      # Create the Ansible Inventory file
+      # First populate Ungrouped hosts
+      echo "#{INVENTORY_UNGROUPED_LIST}" >> /etc/ansible/inventory  
+      # Then the host groups (for maximum of four managed nodess) 
+      number_managed_hosts="#{number_managed_hosts}"
+      if [[ "$number_managed_hosts" -eq 1 ]]; then
+        echo "#{ANSIBLE_INVENTORY_1}" >> /etc/ansible/inventory
+      elif [[ "$number_managed_hosts" -eq 2 ]]; then
+        echo "#{ANSIBLE_INVENTORY_2}" >> /etc/ansible/inventory
+      elif [[ "$number_managed_hosts" -eq 3 ]]; then
+        echo "#{ANSIBLE_INVENTORY_3}" >> /etc/ansible/inventory
+      else
+        echo "#{ANSIBLE_INVENTORY_4}" >> /etc/ansible/inventory
+      fi
+
+      # Populate the known hosts file on workstation for users student and ansible
+      echo "#{KNOWN_HOSTS_LIST}" > /tmp/known_hosts_vtYrd4ErWo
+      ssh-keyscan  -f /tmp/known_hosts_vtYrd4ErWo | su student -c "tee -a /home/student/.ssh/known_hosts" | su ansible -c "tee -a /home/ansible/.ssh/known_hosts" > /dev/null
+
+      # Update the managed hosts
+      server_list_str="#{SERVER_LIST}"
+      
+      for server in $server_list_str; do
+        # Copy the public key to managed hosts to enable key-based ssh authentication
+        su student -c "sshpass -p 'student' ssh-copy-id -o StrictHostKeyChecking=no student@${server}"
+        su ansible -c "sshpass -p 'ansible' ssh-copy-id -o StrictHostKeyChecking=no ansible@${server}"
+        # Copy ETC_HOSTS to server
+        su student -c "ansible -i ${server}, all -u student -m copy -a 'src=/tmp/etc_hosts_vtYrd4ErWo dest=/tmp/etc_hosts_vtYrd4ErWo'"
+        su student -c "ansible -i ${server}, all -u student -m shell -a 'cat /tmp/etc_hosts_vtYrd4ErWo | sudo tee -a /etc_hosts && rm -f /tmp/etc_hosts_vtYrd4ErWo'"
+        # Copy over id_rsa and id_rsa.pub to enable ssh FROM those servers to any other server
+        su student -c "ansible -i ${server}, all -u student -m copy -a 'src=/home/student/.ssh/id_rsa dest=/home/student/.ssh/id_rsa mode=0600 owner=student group=student' --become"
+        su student -c "ansible -i ${server}, all -u student -m copy -a 'src=/home/student/.ssh/id_rsa.pub dest=/home/student/.ssh/id_rsa.pub mode=0644 owner=student group=student' --become"
+        su ansible -c "ansible -i ${server}, all -m copy -a 'src=/home/ansible/.ssh/id_rsa dest=/home/ansible/.ssh/id_rsa mode=0600 owner=ansible group=ansible' --become"
+        su ansible -c "ansible -i ${server}, all -m copy -a 'src=/home/ansible/.ssh/id_rsa.pub dest=/home/ansible/.ssh/id_rsa.pub mode=0644 owner=ansible group=ansible' --become"
+        # Copy over the comprehensive known hosts file to the managed hosts
+        su student -c "scp -q -o StrictHostKeyChecking=no /home/student/.ssh/known_hosts $server:/home/student/.ssh/known_hosts"
+        su ansible -c "scp -q -o StrictHostKeyChecking=no /home/ansible/.ssh/known_hosts $server:/home/ansible/.ssh/known_hosts"
+
+        done
+        rm -r /tmp/etc_hosts_vtYrd4ErWo /tmp/known_hosts_vtYrd4ErWo
+    SHELL
+
+    # Other workstation configuration here...
+  
+  end
+
+  # Other global configuration if needed...
+end
