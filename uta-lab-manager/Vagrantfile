@@ -264,7 +264,7 @@ Vagrant.configure("2") do |config|
         subscription-manager register --username "#{redhat_username}" --password "#{redhat_password}"
         if [ $? -eq 0 ]; then
           echo "#{server.vm.hostname} registered successfully.\nRegistering insights-client..."
-          insights-client --register &> /dev/null
+          insights-client --register &> /dev/null &
           echo "Done."
         else
           echo "System registration failed. Please check your credentials or network connectivity."
@@ -314,7 +314,7 @@ Vagrant.configure("2") do |config|
       subscription-manager register --username "#{redhat_username}" --password "#{redhat_password}"
       if [ $? -eq 0 ]; then
       echo "#{workstation.vm.hostname} registered successfully.\nRegistering insights-client..."
-      insights-client --register &> /dev/null
+      insights-client --register &> /dev/null &
       echo "Done."
       else
         echo "System registration failed. Please check your credentials or network connectivity."
@@ -398,8 +398,9 @@ Vagrant.configure("2") do |config|
         su student -c "scp -q -o StrictHostKeyChecking=no /home/student/.ssh/known_hosts $server:/home/student/.ssh/known_hosts"
         su ansible -c "scp -q -o StrictHostKeyChecking=no /home/ansible/.ssh/known_hosts $server:/home/ansible/.ssh/known_hosts"
 
-        done
-        rm -f /tmp/etc_hosts_vtYrd4ErWo /tmp/known_hosts_vtYrd4ErWo
+      done
+      rm -f /tmp/etc_hosts_vtYrd4ErWo /tmp/known_hosts_vtYrd4ErWo
+
     SHELL
 
     # Other workstation configuration here...
