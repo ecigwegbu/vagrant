@@ -41,7 +41,7 @@
 # [Environment]::SetEnvironmentVariable('REDHAT_USERNAME', $null, [EnvironmentVariableTarget]::User)
 
 # To specify an environment variable on the command line when starting Vagrant, use the syntax below:
-# $env:HOSTS=2; $env:REDHAT_USERNAME="example-jdoe1998"; REDHAT_PASSWORD="example-k45U_T6hi0Yt" vagrant up
+# $env:HOSTS=2; $env:REDHAT_USERNAME="example-jdoe1998"; REDHAT_PASSWORD="example-k45U_T6hi0Yt"; vagrant up
 
 # If The Lab Manager is unable to find the Red Hat username/password at runtime, the user will be prompted
 # to specify them interactively, and can then optionally save them permanently to the OS.
