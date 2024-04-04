@@ -1,9 +1,7 @@
-This Repo is for utilities/projects I manage on the Vagrant profile.
+This Repo is for utilities/IaC projects I built on the Hashicorp's Vagrant platform.
 
 Unix Training Academy Lab Manager:
 
-markdown
-Copy code
 # Unix Training Academy Lab Manager™ version 1.0-beta (Windows/PowerShell edition)
 
 ## README
@@ -39,7 +37,7 @@ To specify an environment variable on the command line when starting Vagrant, us
 
 powershell
 Copy code
-$env:HOSTS=2; $env:REDHAT_USERNAME="example-jdoe1998"; REDHAT_PASSWORD="example-k45U_T6hi0Yt" vagrant up
+$env:HOSTS=2; $env:REDHAT_USERNAME="example-jdoe1998"; REDHAT_PASSWORD="example-k45U_T6hi0Yt"; vagrant up
 If The Lab Manager is unable to find the Red Hat username/password at runtime, the user will be prompted to specify them interactively, and can then optionally save them permanently to the OS.
 
 To use the Vagrantfile, enter this command in PowerShell (start PowerShell as Administrator):

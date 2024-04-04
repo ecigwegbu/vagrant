@@ -47,7 +47,7 @@
 # to specify them interactively, and can then optionally save them permanently to the OS.
 
 # To use the Vagrantfile, enter this command in PowerShell (start PowerShell as Administrator):
-# $env:HOSTS=2; $env:REDHAT_USERNAME="example-jdoe1998"; REDHAT_PASSWORD="example-k45U_T6hi0Yt" vagrant up
+# $env:HOSTS=2; $env:REDHAT_USERNAME="example-jdoe1998"; REDHAT_PASSWORD="example-k45U_T6hi0Yt"; vagrant up
 # Or simply: vagrant up  (to use default values from the Environment)
 # Then wait until it finishes provisioning, unless otherwise prompted for username/password.
 # If HOSTS is not specified (commandline or Environment) then a default value of 2 
@@ -264,6 +264,11 @@ Vagrant.configure("2") do |config|
       server.vm.hostname = "server#{('a'.ord + i - 1).chr}.lab.uta.com"
       server.vm.network "private_network", ip: "192.168.56.#{10 + i}"
 
+      # Specify VM memory
+      server.vm.provider "virtualbox" do |vb|
+        vb.memory = "1024"  # Set the VM to use 1 GB of RAM
+      end
+
       # Enable password authentication and reload SSHD
       server.vm.provision "shell", inline: <<-SHELL
         sudo sed -i.bak 's/^PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
@@ -307,6 +312,11 @@ Vagrant.configure("2") do |config|
     workstation.vm.box = "generic/rhel9"
     workstation.vm.hostname = "workstation.lab.uta.com"
     workstation.vm.network "private_network", ip: "192.168.56.10"
+
+    # Specify VM memory
+    workstation.vm.provider "virtualbox" do |vb|
+      vb.memory = "2048"  # Set the VM to use 2 GB of RAM
+    end
 
     # Enable password authentication and reload SSHD
     workstation.vm.provision "shell", inline: <<-SHELL
