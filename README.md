@@ -44,7 +44,7 @@ To use the Vagrantfile, enter this command in PowerShell (start PowerShell as Ad
 
 powershell
 Copy code
-$env:HOSTS=2; $env:REDHAT_USERNAME="example-jdoe1998"; REDHAT_PASSWORD="example-k45U_T6hi0Yt" vagrant up
+$env:HOSTS=2; $env:REDHAT_USERNAME="example-jdoe1998"; REDHAT_PASSWORD="example-k45U_T6hi0Yt"; vagrant up
 Or simply: vagrant up (to use default values from the Environment) Then wait until it finishes provisioning, unless otherwise prompted for username/password. If HOSTS is not specified (command line or Environment) then a default value of 2 (for servera and serverb) will be used. (This default can be changed within the Vagrantfile, see below.)
 
 Once the provisioning ends, from the Vagrantfile directory, ssh to workstation (starting with workstation is the typical use case, but servera, serverb, etc., is also possible):
