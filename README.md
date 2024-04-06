@@ -63,9 +63,9 @@ This Repo is for utilities/IaC projects I built on the Hashicorp's Vagrant platf
 # Once the provisioning ends, you can use an SSH client like Putty to connect from Windows to any of the  
 # servers, and as any of the three users - student, ansible or vagrant. The server's ip address are:
 # 192.168.56.10 (workstation), 192.168.56.11 (servera), 192.168.56.11 (serverb) etc. In addition, 
-# user vagrant can also connect password-less from Putty using the private key stored at:
+# user vagrant can also connect password-less from PowerShell using the pem private key stored at:
 # '.vagrant\machines\<server-name>\virtualbox\private_key'. (Note: Only user vagrant has key-based
-# SSH login from Windows, using a client like Putty.) 
+# SSH login from the Windows host.) 
 # 
 # You can also connect to any of the servers using the default vagrant account from PowerShell:
 # vagrant ssh workstation
