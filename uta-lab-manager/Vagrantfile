@@ -2,7 +2,7 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 
-# Unix Training Academy Lab Manager™ version 1.0-beta (Windows/PowerShell edition)
+# Unix Training Academy Lab Manager™ version 1.0.1-beta (Windows/PowerShell edition)
 #
 # README:
 #
@@ -56,7 +56,7 @@
 # Red Hat Linux server 'workstation' directory: /home/student/windows_shared
 # Files saved in either directory can be read from the other by the student user.
 # Note: Your project directory is any directory you choose yourself for your project data; 
-# Vagrantfile must be located within it.
+# Vagrantfile must be located within it. If the shared directory does not exist, the Lab Manager will create it.
 # 
 # The first time you run Vagrantfile, it may automatically download the box image from its online repository,
 # so the process may take longer than usual. This image is Vagrant-specific box image for the VirtualBox
@@ -330,8 +330,8 @@ KNOWN_HOSTS_LIST = "192.168.56.10\nworkstation\nworkstation.lab.uta.com\n" + \
 "server#{('a'.ord + i - 1).chr}\n" + \
 "server#{('a'.ord + i - 1).chr}.lab.uta.com" }.join("\n")
 
-# Execute PowerShell script and capture output
-credentials = `powershell -Command "#{decrypt_script}"`.split("\n")
+# Ensure the workstation_shared directory exists
+Dir.mkdir("./workstation_shared") unless Dir.exist?("./workstation_shared")
 
 Vagrant.configure("2") do |config|
 
@@ -353,12 +353,12 @@ Vagrant.configure("2") do |config|
       server.vm.provision "shell", inline: <<-SHELL
         sudo sed -i.bak 's/^PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
         sudo systemctl reload sshd
-        # Register the system (using placeholder credentials)
+        # Register the system with Red Hat Subscriotion Management
         echo "Registering the system with subscription-manager..."
-        subscription-manager register --username="$(echo -e '#{credentials[0]}')" --password="$(echo -e '#{credentials[1]}')"
+        subscription-manager register --username="$(echo -e '#{redhat_username}')" --password="$(echo -e '#{redhat_password}')"
         if [ $? -eq 0 ]; then
           echo "#{server.vm.hostname} registered successfully.\nRegistering insights-client..."
-          insights-client --register &> /dev/null &
+          insights-client --register > /dev/null 2>&1 &
           echo "Done."
         else
           echo "System registration failed. Please check your credentials or network connectivity."
@@ -387,6 +387,7 @@ Vagrant.configure("2") do |config|
       SHELL
     end
   end
+
   # Workstation configuration
   config.vm.define "workstation" do |workstation|
     workstation.vm.box = "generic/rhel9"
@@ -407,10 +408,10 @@ Vagrant.configure("2") do |config|
       sudo systemctl reload sshd
       # Register the system (using placeholder credentials)
       echo "Registering the system with subscription-manager..."
-      subscription-manager register --username="$(echo -e '#{credentials[0]}')" --password="$(echo -e '#{credentials[1]}')"
+      subscription-manager register --username="$(echo -e '#{redhat_username}')" --password="$(echo -e '#{redhat_password}')"
       if [ $? -eq 0 ]; then
         echo "#{workstation.vm.hostname} registered successfully.\nRegistering insights-client..."
-        insights-client --register &> /dev/null &
+        insights-client --register > /dev/null 2>&1 &
         echo "Done."
       else
         echo "System registration failed. Please check your credentials or network connectivity."
@@ -447,29 +448,36 @@ Vagrant.configure("2") do |config|
       chmod 600 /home/ansible/.ssh/authorized_keys
 
       # Install Ansible and sshpass
-      dnf makecache
-      dnf -y install epel-release
-      dnf -y install ansible sshpass
-      ansible --version
-
-      # Create the Ansible Config file
-      echo "#{ANSIBLE_CFG}" > /etc/ansible/ansible.cfg
-      
-      # Create the Ansible Inventory file
-      # First populate Ungrouped hosts
-      echo "#{INVENTORY_UNGROUPED_LIST}" >> /etc/ansible/inventory  
-      # Then the host groups (for maximum of four managed nodess) 
-      number_managed_hosts="#{number_managed_hosts}"
-      if [[ "$number_managed_hosts" -eq 1 ]]; then
-        echo "#{ANSIBLE_INVENTORY_1}" >> /etc/ansible/inventory
-      elif [[ "$number_managed_hosts" -eq 2 ]]; then
-        echo "#{ANSIBLE_INVENTORY_2}" >> /etc/ansible/inventory
-      elif [[ "$number_managed_hosts" -eq 3 ]]; then
-        echo "#{ANSIBLE_INVENTORY_3}" >> /etc/ansible/inventory
+      if ! [[ "$(dnf repolist | grep '^rhel-9' | wc -l)" ]]; then
+        rhel9_repo=false
+        echo "RHEL 9 Repository not found.\\nCheck registration/subscription. Continuing without installing Ansible...";
       else
-        echo "#{ANSIBLE_INVENTORY_4}" >> /etc/ansible/inventory
-      fi
+        rhel9_repo=true
+        echo "Installing Ansible..."
+        # dnf upgrade -y
+        dnf makecache
+        dnf -y install epel-release
+        dnf -y install ansible sshpass
+        ansible --version
 
+        # Create the Ansible Config file
+        echo "#{ANSIBLE_CFG}" > /etc/ansible/ansible.cfg
+        
+        # Create the Ansible Inventory file
+        # First populate Ungrouped hosts
+        echo "#{INVENTORY_UNGROUPED_LIST}" >> /etc/ansible/inventory  
+        # Then the host groups (for maximum of four managed nodess) 
+        number_managed_hosts="#{number_managed_hosts}"
+        if [[ "$number_managed_hosts" -eq 1 ]]; then
+          echo "#{ANSIBLE_INVENTORY_1}" >> /etc/ansible/inventory
+        elif [[ "$number_managed_hosts" -eq 2 ]]; then
+          echo "#{ANSIBLE_INVENTORY_2}" >> /etc/ansible/inventory
+        elif [[ "$number_managed_hosts" -eq 3 ]]; then
+          echo "#{ANSIBLE_INVENTORY_3}" >> /etc/ansible/inventory
+        else
+          echo "#{ANSIBLE_INVENTORY_4}" >> /etc/ansible/inventory
+        fi
+      fi
       # Populate the known hosts file on workstation for users student and ansible
       echo "#{KNOWN_HOSTS_LIST}" > /tmp/known_hosts_vtYrd4ErWo
       ssh-keyscan  -f /tmp/known_hosts_vtYrd4ErWo | su student -c "tee -a /home/student/.ssh/known_hosts" | su ansible -c "tee -a /home/ansible/.ssh/known_hosts" > /dev/null
@@ -479,17 +487,19 @@ Vagrant.configure("2") do |config|
       server_list_str="#{SERVER_LIST}"
       
       for server in $server_list_str; do
-        # Copy the public key to managed hosts to enable key-based ssh authentication
-        su student -c "sshpass -p 'student' ssh-copy-id -o StrictHostKeyChecking=no student@${server}"
-        su ansible -c "sshpass -p 'ansible' ssh-copy-id -o StrictHostKeyChecking=no ansible@${server}"
-        # Copy ETC_HOSTS to server
-        su student -c "ansible -i ${server}, all -u student -m copy -a 'src=/tmp/etc_hosts_vtYrd4ErWo dest=/tmp/etc_hosts_vtYrd4ErWo'"
-        su student -c "ansible -i ${server}, all -u student -m shell -a 'cat /tmp/etc_hosts_vtYrd4ErWo | sudo tee -a /etc_hosts && rm -f /tmp/etc_hosts_vtYrd4ErWo'"
-        # Copy over id_rsa and id_rsa.pub to enable ssh FROM those servers to any other server
-        su student -c "ansible -i ${server}, all -u student -m copy -a 'src=/home/student/.ssh/id_rsa dest=/home/student/.ssh/id_rsa mode=0600 owner=student group=student' --become"
-        su student -c "ansible -i ${server}, all -u student -m copy -a 'src=/home/student/.ssh/id_rsa.pub dest=/home/student/.ssh/id_rsa.pub mode=0644 owner=student group=student' --become"
-        su ansible -c "ansible -i ${server}, all -m copy -a 'src=/home/ansible/.ssh/id_rsa dest=/home/ansible/.ssh/id_rsa mode=0600 owner=ansible group=ansible' --become"
-        su ansible -c "ansible -i ${server}, all -m copy -a 'src=/home/ansible/.ssh/id_rsa.pub dest=/home/ansible/.ssh/id_rsa.pub mode=0644 owner=ansible group=ansible' --become"
+        if [[ "${rhel9_repo}" ]]; then
+          # Copy the public key to managed hosts to enable key-based ssh authentication
+          su student -c "sshpass -p 'student' ssh-copy-id -o StrictHostKeyChecking=no student@${server}"
+          su ansible -c "sshpass -p 'ansible' ssh-copy-id -o StrictHostKeyChecking=no ansible@${server}"
+          # Copy ETC_HOSTS to server
+          su student -c "ansible -i ${server}, all -u student -m copy -a 'src=/tmp/etc_hosts_vtYrd4ErWo dest=/tmp/etc_hosts_vtYrd4ErWo'"
+          su student -c "ansible -i ${server}, all -u student -m shell -a 'cat /tmp/etc_hosts_vtYrd4ErWo | sudo tee -a /etc_hosts && rm -f /tmp/etc_hosts_vtYrd4ErWo'"
+          # Copy over id_rsa and id_rsa.pub to enable ssh FROM those servers to any other server
+          su student -c "ansible -i ${server}, all -u student -m copy -a 'src=/home/student/.ssh/id_rsa dest=/home/student/.ssh/id_rsa mode=0600 owner=student group=student' --become"
+          su student -c "ansible -i ${server}, all -u student -m copy -a 'src=/home/student/.ssh/id_rsa.pub dest=/home/student/.ssh/id_rsa.pub mode=0644 owner=student group=student' --become"
+          su ansible -c "ansible -i ${server}, all -m copy -a 'src=/home/ansible/.ssh/id_rsa dest=/home/ansible/.ssh/id_rsa mode=0600 owner=ansible group=ansible' --become"
+          su ansible -c "ansible -i ${server}, all -m copy -a 'src=/home/ansible/.ssh/id_rsa.pub dest=/home/ansible/.ssh/id_rsa.pub mode=0644 owner=ansible group=ansible' --become"
+        fi
         # Copy over the comprehensive known hosts file to the managed hosts
         su student -c "scp -q -o StrictHostKeyChecking=no /home/student/.ssh/known_hosts $server:/home/student/.ssh/known_hosts"
         su ansible -c "scp -q -o StrictHostKeyChecking=no /home/ansible/.ssh/known_hosts $server:/home/ansible/.ssh/known_hosts"

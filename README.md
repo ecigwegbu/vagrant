@@ -54,7 +54,7 @@ This Repo is for utilities/IaC projects I built on the Hashicorp's Vagrant platf
 # Red Hat Linux server 'workstation' directory: /home/student/windows_shared
 # Files saved in either directory can be read from the other by the student user.
 # Note: Your project directory is any directory you choose yourself for your project data; 
-# Vagrantfile must be located within it.
+# Vagrantfile must be located within it. If the shared folder does not exist, the Lab Manager will create it on start-up.
 # 
 # The first time you run Vagrantfile, it may automatically download the box image from its online repository,
 # so the process may take longer than usual. This image is Vagrant-specific box image for the VirtualBox
