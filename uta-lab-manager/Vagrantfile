@@ -2,7 +2,7 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 
-# Unix Training Academy Lab Manager™ version 1.0.1-beta (Windows/PowerShell edition)
+# Unix Training Academy Lab Manager™ version 1.0.2-beta (Windows/PowerShell edition)
 #
 # README:
 #
@@ -101,7 +101,7 @@
 require 'io/console'
 require 'fileutils'
 
-puts "\nLab Manager\u2122 version 1.0.1-beta\n\u00A9 2024 Unix Training Academy. All Rights Reserved...\n\n"
+puts "\nLab Manager\u2122 version 1.0.2-beta\n\u00A9 2024 Unix Training Academy. All Rights Reserved...\n\n"
 
 # Attempt to read the MANAGED_HOSTS environment variable,
 # then try the config file, then finally default to DEFAULT_MANAGED_HOSTS if none found
@@ -345,8 +345,10 @@ Vagrant.configure("2") do |config|
 
       # Customise VM memory and display name
       server.vm.provider "virtualbox" do |vb|
-        vb.memory = "1024"  # Set the VM to use 1 GB of RAM    
+        vb.memory = "1024"  # Set the VM to use 1 GB of RAM   
+        # vb.cpus = 2  # Try 2 CPUs 
         vb.name = "UTA-Server#{('a'.ord + i - 1).chr}"
+        # vb.gui = true  # for debugging
       end
 
       # Enable password authentication and reload SSHD
@@ -400,6 +402,7 @@ Vagrant.configure("2") do |config|
     workstation.vm.provider "virtualbox" do |vb|
       vb.memory = "2048"  # Set the VM to use 2 GB of RAM
       vb.name = "UTA-Workstation"
+      # vb.gui = true  # for debugging
     end
 
     # Enable password authentication and reload SSHD
@@ -448,11 +451,16 @@ Vagrant.configure("2") do |config|
       chmod 600 /home/ansible/.ssh/authorized_keys
 
       # Install Ansible and sshpass
-      if ! [[ "$(dnf repolist | grep '^rhel-9' | wc -l)" ]]; then
-        rhel9_repo=false
-        echo "RHEL 9 Repository not found.\\nCheck registration/subscription. Continuing without installing Ansible...";
+      if [[ "$(dnf repolist | grep '^rhel-9' | wc -l)" -eq 0 ]]; then
+        echo
+        rhel9_repo_exists="false"
+        echo "WARNING:"
+        echo "RHEL 9 Repository not found."
+        echo "Check registration/subscription with Red Hat."
+        echo "Continuing without installing Ansible and related features..."
+        echo
       else
-        rhel9_repo=true
+        rhel9_repo_exists="true"
         echo "Installing Ansible..."
         # dnf upgrade -y
         dnf makecache
@@ -478,6 +486,7 @@ Vagrant.configure("2") do |config|
           echo "#{ANSIBLE_INVENTORY_4}" >> /etc/ansible/inventory
         fi
       fi
+
       # Populate the known hosts file on workstation for users student and ansible
       echo "#{KNOWN_HOSTS_LIST}" > /tmp/known_hosts_vtYrd4ErWo
       ssh-keyscan  -f /tmp/known_hosts_vtYrd4ErWo | su student -c "tee -a /home/student/.ssh/known_hosts" | su ansible -c "tee -a /home/ansible/.ssh/known_hosts" > /dev/null
@@ -485,9 +494,9 @@ Vagrant.configure("2") do |config|
 
       # Update the managed hosts
       server_list_str="#{SERVER_LIST}"
-      
+
       for server in $server_list_str; do
-        if [[ "${rhel9_repo}" ]]; then
+        if [[ "${rhel9_repo_exists}" == "true" ]]; then
           # Copy the public key to managed hosts to enable key-based ssh authentication
           su student -c "sshpass -p 'student' ssh-copy-id -o StrictHostKeyChecking=no student@${server}"
           su ansible -c "sshpass -p 'ansible' ssh-copy-id -o StrictHostKeyChecking=no ansible@${server}"
@@ -500,8 +509,10 @@ Vagrant.configure("2") do |config|
           su ansible -c "ansible -i ${server}, all -m copy -a 'src=/home/ansible/.ssh/id_rsa dest=/home/ansible/.ssh/id_rsa mode=0600 owner=ansible group=ansible' --become"
           su ansible -c "ansible -i ${server}, all -m copy -a 'src=/home/ansible/.ssh/id_rsa.pub dest=/home/ansible/.ssh/id_rsa.pub mode=0644 owner=ansible group=ansible' --become"
         fi
+
         # Copy over the comprehensive known hosts file to the managed hosts
         su student -c "scp -q -o StrictHostKeyChecking=no /home/student/.ssh/known_hosts $server:/home/student/.ssh/known_hosts"
+
         su ansible -c "scp -q -o StrictHostKeyChecking=no /home/ansible/.ssh/known_hosts $server:/home/ansible/.ssh/known_hosts"
 
       done
@@ -513,9 +524,10 @@ Vagrant.configure("2") do |config|
     SHELL
 
     # Other workstation configuration here...
-  
+
   end
 
   # Other global configuration if needed...
 
 end
+

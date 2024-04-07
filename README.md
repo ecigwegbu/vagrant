@@ -1,6 +1,6 @@
 This Repo is for utilities/IaC projects I built on the Hashicorp's Vagrant platform.
 
-# Unix Training Academy Lab Manager™ version 1.0-beta (Windows/PowerShell edition)
+# Unix Training Academy Lab Manager™ version 1.0.2-beta (Windows/PowerShell edition)
 #
 # README:
 #
