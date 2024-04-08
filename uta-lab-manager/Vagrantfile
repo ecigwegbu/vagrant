@@ -213,7 +213,7 @@ elsif File.exist?('./.vagrant/vtYrd4ErWoa.uta') && File.exist?('./.vagrant/vtYrd
   redhat_password = credentials[1]
 else
   puts "Red Hat subscription-manager username and password are not set."
-  puts "They are required in order to install packages from Red Hat.\n"
+  puts "They are required in order to install packages from Red Hat.\n\n"
   puts "Enter REDHAT_USERNAME (or press Enter to exit):"
 
   # Prompt the user for input for REDHAT_USERNAME
