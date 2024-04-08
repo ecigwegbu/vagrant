@@ -2,14 +2,14 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 
-# Unix Training Academy Lab Manager™ version 1.0.2-beta (Windows/PowerShell edition)
+# Unix Training Academy Lab Manager™ version 1.0.3-beta (Windows/PowerShell edition)
 #
 # README:
 #
 # This Vagrantfile provisions the Unix Training Academy training lab. The lab consists of a RHEL9 workstation
 # and one or more other RHEL9 servers, named servera, serverb, etc (default: workstation + 2 others), up to 
 # a maximum of 26 servers + workstation, limited by your system's memory. Workstation uses 2 GB of RAM while
-# the other servers use 1 GB of RAM each. (Warning: exceeding 4 servers could run down your system's memory).
+# the other servers use 1.5 GB of RAM each. (Warning: exceeding 4 servers could run down your system's memory).
 #
 # Three users, vagrant, student, and ansible, are defined in each VM (with initial passwords same as username).
 # By default, for user vagrant, Vagrant provides password-less key-based ssh login from Windows (this version 
@@ -39,7 +39,7 @@
 # for use the next time you run vagrant. You can manaully modify the config file, though this is not recommended.
 # Warning: Your system could run out of memory if you try to provision too many servers. While the Lab Manager can
 # handle up to 27 servers (workstation + 26 managed hosts), the practical limit will depend on the available RAM.
-# Workstation uses 2GB RAM while the managed hosts use 1GB RAM each. For an 8GB system, for example, do not try to exceed
+# Workstation uses 2GB RAM while the managed hosts use 1.5GB RAM each. For an 8GB system, for example, do not try to exceed
 # 4 managed hosts).
 # 
 # The Lab Manager will also prompt you for the Red Hat Subscription Mangager username and password. This is required
@@ -101,11 +101,13 @@
 require 'io/console'
 require 'fileutils'
 
-puts "\nLab Manager\u2122 version 1.0.2-beta\n\u00A9 2024 Unix Training Academy. All Rights Reserved...\n\n"
+puts "\nLab Manager\u2122 version 1.0.3-beta\n\u00A9 2024 Unix Training Academy. All Rights Reserved...\n\n"
 
+# Start session timer
+start_time = Time.now
+puts "Start time: #{start_time}"
 # Attempt to read the MANAGED_HOSTS environment variable,
 # then try the config file, then finally default to DEFAULT_MANAGED_HOSTS if none found
-
 DEFAULT_MANAGED_HOSTS = 2
 config_file_path = './.vagrant/config.uta'
 
@@ -153,7 +155,6 @@ else
   number_managed_hosts = DEFAULT_MANAGED_HOSTS
   write_managed_hosts_to_config(config_file_path, number_managed_hosts)
 end
-
 # Validate the number of managed hosts to be between 1 and 26, inclusive
 number_managed_hosts = number_managed_hosts.between?(1, 26) ? number_managed_hosts : DEFAULT_MANAGED_HOSTS
 
@@ -162,7 +163,31 @@ puts "Number of managed hosts: #{number_managed_hosts}"
 
 ## Now process Red Hat username and password input
 # Check if the REDHAT_USERNAME environment variable is set
-if File.exist?('./.vagrant/vtYrd4ErWoa.uta') && File.exist?('./.vagrant/vtYrd4ErWob.uta')
+if ENV['REDHAT_USERNAME'] && ENV['REDHAT_PASSWORD']
+  # Get the redhat username and password from the ENV variables (permanent or command line)
+  redhat_username = ENV['REDHAT_USERNAME']
+  redhat_password = ENV['REDHAT_PASSWORD']
+  # Then encrypt and store it
+
+  # Username and Password received. Now encrypt and store them
+  # PowerShell script to encrypt credentials and save them to files
+  encrypt_username_script = %(
+    $Username = '#{redhat_username}'
+    $EncryptedUsername = ConvertTo-SecureString $Username -AsPlainText -Force | ConvertFrom-SecureString
+    Set-Content -Path "./.vagrant/vtYrd4ErWoa.uta" -Value $EncryptedUsername
+  )
+  encrypt_password_script = %(
+    $Password = '#{redhat_password}'
+    $EncryptedPassword = ConvertTo-SecureString $Password -AsPlainText -Force | ConvertFrom-SecureString
+    Set-Content -Path "./.vagrant/vtYrd4ErWob.uta" -Value $EncryptedPassword
+  )
+  # Execute PowerShell scripts
+  `powershell -Command "#{encrypt_username_script}"`
+  `powershell -Command "#{encrypt_password_script}"`
+  # Note: The above code snippets are Ruby strings that contain PowerShell commands. They are passed to the PowerShell interpreter for execution.
+
+  puts "\nREDHAT_USERNAME / REDHAT_PASSWORD loaded, pending validation...\n\n"
+elsif File.exist?('./.vagrant/vtYrd4ErWoa.uta') && File.exist?('./.vagrant/vtYrd4ErWob.uta')
   # Proceed with decryption of credentials
   # Define the full path to the encrypted files using Ruby
   encrypted_username_path = File.expand_path('./.vagrant/vtYrd4ErWoa.uta', __dir__)
@@ -185,7 +210,6 @@ if File.exist?('./.vagrant/vtYrd4ErWoa.uta') && File.exist?('./.vagrant/vtYrd4Er
     Write-Output $PlainUsername
     Write-Output $PlainPassword
   )
-
   # Execute PowerShell script and capture output
   credentials = `powershell -Command "#{decrypt_script}"`.split("\n")
   redhat_username = credentials[0]
@@ -239,7 +263,7 @@ else
   `powershell -Command "#{encrypt_password_script}"`
   # Note: The above code snippets are Ruby strings that contain PowerShell commands. They are passed to the PowerShell interpreter for execution.
 
-  puts "\n'REDHAT_USERNAME / REDHAT_PASSWORD' set, pending validation...\n"
+  puts "\nREDHAT_USERNAME / REDHAT_PASSWORD loaded, pending validation...\n\n"
 end
 
 # Create the Global variables
@@ -333,23 +357,27 @@ KNOWN_HOSTS_LIST = "192.168.56.10\nworkstation\nworkstation.lab.uta.com\n" + \
 # Ensure the workstation_shared directory exists
 Dir.mkdir("./workstation_shared") unless Dir.exist?("./workstation_shared")
 
+# Generate a random 3-digit number - identifier for this session
+random_number = sprintf('%03d', rand(0..999))
 Vagrant.configure("2") do |config|
 
-  # Dynamically create managed host VMs
-  (1..number_managed_hosts).each do |i|
-    config.vm.define "server#{('a'.ord + i - 1).chr}" do |server|
-      server.vm.box = "generic/rhel9"
-      server.vm.hostname = "server#{('a'.ord + i - 1).chr}.lab.uta.com"
-      server.vm.network "private_network", ip: "192.168.56.#{10 + i}"
-      server.vm.network "forwarded_port", guest: 22, host: 2263 + i, id: "ssh"
+# Dynamically create managed host VMs
+(1..number_managed_hosts).each do |i|
+  config.vm.define "server#{('a'.ord + i - 1).chr}" do |server|
+    server.vm.box = "generic/rhel9"
+    # Adjust hostname to incorporate new naming convention with random number
+    server.vm.hostname = "server#{('a'.ord + i - 1).chr}.lab.uta.com"
+    server.vm.network "private_network", ip: "192.168.56.#{10 + i}"
+    server.vm.network "forwarded_port", guest: 22, host: 2263 + i, id: "ssh"
 
-      # Customise VM memory and display name
-      server.vm.provider "virtualbox" do |vb|
-        vb.memory = "1024"  # Set the VM to use 1 GB of RAM   
-        # vb.cpus = 2  # Try 2 CPUs 
-        vb.name = "UTA-Server#{('a'.ord + i - 1).chr}"
-        # vb.gui = true  # for debugging
-      end
+    # Customise VM memory and display name
+    server.vm.provider "virtualbox" do |vb|
+      vb.memory = "1536"  # Set the VM to use 1.5 GB of RAM   
+      # vb.cpus = 2  # Try 2 CPUs 
+      # Adjust vb.name to include random number and follow the new naming convention
+      vb.name = "UTA-#{random_number}-Server#{('a'.ord + i - 1).chr}"
+      # vb.gui = true  # for debugging
+    end
 
       # Enable password authentication and reload SSHD
       server.vm.provision "shell", inline: <<-SHELL
@@ -390,20 +418,21 @@ Vagrant.configure("2") do |config|
     end
   end
 
-  # Workstation configuration
-  config.vm.define "workstation" do |workstation|
-    workstation.vm.box = "generic/rhel9"
-    workstation.vm.hostname = "workstation.lab.uta.com"
-    workstation.vm.network "private_network", ip: "192.168.56.10"
-    workstation.vm.network "forwarded_port", guest: 22, host: 2263, id: "ssh"
-    workstation.vm.synced_folder "./workstation_shared", "/windows_shared"
+# Workstation configuration
+config.vm.define "workstation" do |workstation|
+  workstation.vm.box = "generic/rhel9"
+  workstation.vm.hostname = "workstation.lab.uta.com"
+  workstation.vm.network "private_network", ip: "192.168.56.10"
+  workstation.vm.network "forwarded_port", guest: 22, host: 2263, id: "ssh"
+  workstation.vm.synced_folder "./workstation_shared", "/windows_shared"
 
-    # Customise VM memory and display name
-    workstation.vm.provider "virtualbox" do |vb|
-      vb.memory = "2048"  # Set the VM to use 2 GB of RAM
-      vb.name = "UTA-Workstation"
-      # vb.gui = true  # for debugging
-    end
+  # Customise VM memory and display name with random number
+  workstation.vm.provider "virtualbox" do |vb|
+    vb.memory = "2048"  # Set the VM to use 2 GB of RAM
+    # Include the random number in the name following the new naming convention
+    vb.name = "UTA-#{random_number}-Workstation"
+    # vb.gui = true  # for debugging
+  end
 
     # Enable password authentication and reload SSHD
     workstation.vm.provision "shell", inline: <<-SHELL
@@ -520,8 +549,12 @@ Vagrant.configure("2") do |config|
 
       # Configure workstation for Guided Exercises
       su student -c "cp /usr/bin/zcat /home/student"
-
+      
     SHELL
+    end_time = Time.now
+    puts "End time: #{end_time}"
+    runtime_in_minutes = ((end_time - start_time) / 60).round(2)
+    puts "Runtime: #{runtime_in_minutes} minutes"
 
     # Other workstation configuration here...
 

@@ -1,13 +1,13 @@
 This Repo is for utilities/IaC projects I built on the Hashicorp's Vagrant platform.
 
-# Unix Training Academy Lab Manager™ version 1.0.2-beta (Windows/PowerShell edition)
+# Unix Training Academy Lab Manager™ version 1.0.3-beta (Windows/PowerShell edition)
 #
 # README:
 #
 # This Vagrantfile provisions the Unix Training Academy training lab. The lab consists of a RHEL9 workstation
 # and one or more other RHEL9 servers, named servera, serverb, etc (default: workstation + 2 others), up to 
 # a maximum of 26 servers + workstation, limited by your system's memory. Workstation uses 2 GB of RAM while
-# the other servers use 1 GB of RAM each. (Warning: exceeding 4 servers could run down your system's memory).
+# the other servers use 1.5 GB of RAM each. (Warning: exceeding 4 servers could run down your system's memory).
 #
 # Three users, vagrant, student, and ansible, are defined in each VM (with initial passwords same as username).
 # By default, for user vagrant, Vagrant provides password-less key-based ssh login from Windows (this version 
@@ -37,7 +37,7 @@ This Repo is for utilities/IaC projects I built on the Hashicorp's Vagrant platf
 # for use the next time you run vagrant. You can manaully modify the config file, though this is not recommended.
 # Warning: Your system could run out of memory if you try to provision too many servers. While the Lab Manager can
 # handle up to 27 servers (workstation + 26 managed hosts), the practical limit will depend on the available RAM.
-# Workstation uses 2GB RAM while the managed hosts use 1GB RAM each. For an 8GB system, for example, do not try to exceed
+# Workstation uses 2GB RAM while the managed hosts use 1.5GB RAM each. For an 8GB system, for example, do not try to exceed
 # 4 managed hosts).
 # 
 # The Lab Manager will also prompt you for the Red Hat Subscription Mangager username and password. This is required
