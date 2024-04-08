@@ -103,9 +103,6 @@ require 'fileutils'
 
 puts "\nLab Manager\u2122 version 1.0.3-beta\n\u00A9 2024 Unix Training Academy. All Rights Reserved...\n\n"
 
-# Start session timer
-start_time = Time.now
-puts "Start time: #{start_time}"
 # Attempt to read the MANAGED_HOSTS environment variable,
 # then try the config file, then finally default to DEFAULT_MANAGED_HOSTS if none found
 DEFAULT_MANAGED_HOSTS = 2
@@ -551,10 +548,6 @@ config.vm.define "workstation" do |workstation|
       su student -c "cp /usr/bin/zcat /home/student"
       
     SHELL
-    end_time = Time.now
-    puts "End time: #{end_time}"
-    runtime_in_minutes = ((end_time - start_time) / 60).round(2)
-    puts "Runtime: #{runtime_in_minutes} minutes"
 
     # Other workstation configuration here...
 
