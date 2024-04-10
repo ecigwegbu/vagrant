@@ -33,7 +33,7 @@ This Repo is for utilities/IaC projects I built on the Hashicorp's Vagrant platf
 # To provision other than two managed hosts (e.g. 1, 3, 4 or more managed hosts), modify the command thus:
 # $env:MANAGED_HOSTS=4; vagrant up                   [Note: $ is part of the command]
 # The above example will then provision the workstation and 4 other managed hosts (servera, serverb, serverc
-# and serverd). The system will record the specified number of hosts in its config file (./.vagrant/config.uta)
+# and serverd). The system will record the specified number of hosts in its config file (./.vagrant/.utalab/config.uta)
 # for use the next time you run vagrant. You can manaully modify the config file, though this is not recommended.
 # Warning: Your system could run out of memory if you try to provision too many servers. While the Lab Manager can
 # handle up to 27 servers (workstation + 26 managed hosts), the practical limit will depend on the available RAM.
