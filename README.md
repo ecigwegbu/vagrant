@@ -1,13 +1,13 @@
 This Repo is for utilities/IaC projects I built on the Hashicorp's Vagrant platform.
 
-# Unix Training Academy Lab Manager™ version 1.0.3-beta (Windows/PowerShell edition)
+# Unix Training Academy Lab Manager™ version 1.0.5-beta (Windows/PowerShell edition)
 #
 # README:
 #
 # This Vagrantfile provisions the Unix Training Academy training lab. The lab consists of a RHEL9 workstation
 # and one or more other RHEL9 servers, named servera, serverb, etc (default: workstation + 2 others), up to 
 # a maximum of 26 servers + workstation, limited by your system's memory. Workstation uses 2 GB of RAM while
-# the other servers use 1.5 GB of RAM each. (Warning: exceeding 4 servers could run down your system's memory).
+# the other servers use 1.5 GB of RAM each. (Warning: exceeding 3 servers could run down your system's memory).
 #
 # Three users, vagrant, student, and ansible, are defined in each VM (with initial passwords same as username).
 # By default, for user vagrant, Vagrant provides password-less key-based ssh login from Windows (this version 
@@ -31,18 +31,17 @@ This Repo is for utilities/IaC projects I built on the Hashicorp's Vagrant platf
 # vagrant up
 # The Lab Manager will then begin to provision the workstation and (by default) two managed hosts - servera and serverb.
 # To provision other than two managed hosts (e.g. 1, 3, 4 or more managed hosts), modify the command thus:
-# $env:MANAGED_HOSTS=4; vagrant up                   [Note: $ is part of the command]
-# The above example will then provision the workstation and 4 other managed hosts (servera, serverb, serverc
-# and serverd). The system will record the specified number of hosts in its config file (./.vagrant/.utalab/config.uta)
+# $env:MANAGED_HOSTS=3; vagrant up                   [Note: $ is part of the command]
+# The above example will then provision the workstation and 3 other managed hosts (servera, serverb and serverc).
+# The system will record the specified number of hosts in its config file (./.vagrant/.utalab/config.uta)
 # for use the next time you run vagrant. You can manaully modify the config file, though this is not recommended.
 # Warning: Your system could run out of memory if you try to provision too many servers. While the Lab Manager can
 # handle up to 27 servers (workstation + 26 managed hosts), the practical limit will depend on the available RAM.
-# Workstation uses 2GB RAM while the managed hosts use 1.5GB RAM each. For an 8GB system, for example, do not try to exceed
-# 4 managed hosts).
+# Workstation uses 2GB RAM while the managed hosts use 1.5GB RAM each. For an 8GB system, for example, do not try to exceed 3 managed hosts).
 # 
 # The Lab Manager will also prompt you for the Red Hat Subscription Mangager username and password. This is required
-# in order to install required software in the servers being provisioned. If you fail to provide these the program
-# will abort. The username and password you provide interactively will be encripted and securely stored in your project
+# in order to install necessary packages in the servers being provisioned. If you fail to provide these the program
+# will abort. The username and password you provide must be for an active Red Hat account (i.e. renewed less than 12 months ago), with Red Hat Simple Content Access enabled (see access.redhat.com); it will be encrypted and securely stored in your project
 # directory for use the next time you run vagrant, such that the system will not prompt you again. However if
 # you want to use a different set of credentials you can modify the vagrant command thus:
 # $env:REDHAT_USERNAME='your-username'; $env:REDHAT_PASSWORD='your-redhat-password'; vagrant up
@@ -50,8 +49,8 @@ This Repo is for utilities/IaC projects I built on the Hashicorp's Vagrant platf
 # command-line override, and will then replace, the previous cached one for use next time you run vagrant.
 # 
 # The Lab Manager provides the following shared folder mapping between your Windows host and the workstation VM:
-# Windows folder: ./.vagrant/workstation_shared    (this is located in your project directory)
-# Red Hat Linux server 'workstation' directory: /home/student/windows_shared
+# Windows folder: ./workstation_shared    (this is located in your project directory)
+# Red Hat Linux server 'workstation' directory: /windows_shared
 # Files saved in either directory can be read from the other by the student user.
 # Note: Your project directory is any directory you choose yourself for your project data; 
 # Vagrantfile must be located within it. If the shared folder does not exist, the Lab Manager will create it on start-up.
@@ -87,6 +86,8 @@ This Repo is for utilities/IaC projects I built on the Hashicorp's Vagrant platf
 # To resume a suspended VM: vagrant resume
 # To restart a halted VM: vagrant up
 # To halt and restart a VM: vagrant reload
+# To view the status of the VMs: vagrant status
+# Before re-running a failed installation, first run: vagrant destroy -f
 # For help using vagrant: vagrant -h
 # 
 # For updates, checkout: GitHub: https://github.com/ecigwegbu/vagrant/blob/main/uta-lab-manager/Vagrantfile
